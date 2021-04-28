@@ -118,6 +118,7 @@ def training_loop(
     allow_tf32              = False,    # Enable torch.backends.cuda.matmul.allow_tf32 and torch.backends.cudnn.allow_tf32?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
     progress_fn             = None,     # Callback function for updating training progress. Called for all ranks.
+    restart_every           = -1,       # Time interval in seconds to exit code
 ):
     # Initialize.
     start_time = time.time()
@@ -129,6 +130,7 @@ def training_loop(
     torch.backends.cudnn.allow_tf32 = allow_tf32        # Allow PyTorch to internally use tf32 for convolutions
     conv2d_gradfix.enabled = True                       # Improves training speed.
     grid_sample_gradfix.enabled = True                  # Avoids errors with the augmentation pipe.
+    __RESTART__ = torch.tensor(0., device=device)      # will be broadcasted to exit loop
 
     # Load training set.
     if rank == 0:
@@ -343,6 +345,16 @@ def training_loop(
             if rank == 0:
                 print()
                 print('Aborting...')
+
+        # Check for restart.
+        if rank == 0 and restart_every > 0 and time.time() - start_time > restart_every:
+            print('Restart job...')
+            __RESTART__ = torch.tensor(1., device=device)
+        torch.distributed.broadcast(__RESTART__, 0)
+        if __RESTART__:
+            done = True
+            print(f'Process {rank} leaving...')
+            torch.distributed.barrier()
 
         # Save image snapshot.
         if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):

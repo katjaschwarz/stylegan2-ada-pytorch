@@ -16,6 +16,7 @@ import json
 import tempfile
 import torch
 import dnnlib
+import glob
 
 from training import training_loop
 from metrics import metric_main
@@ -35,6 +36,7 @@ def setup_training_loop_kwargs(
     snap       = None, # Snapshot interval: <int>, default = 50 ticks
     metrics    = None, # List of metric names: [], ['fid50k_full'] (default), ...
     seed       = None, # Random seed: <int>, default = 0
+    restart_every = None, # Time interval in seconds to restart the code
 
     # Dataset.
     data       = None, # Training dataset (required): <path>
@@ -97,6 +99,11 @@ def setup_training_loop_kwargs(
         seed = 0
     assert isinstance(seed, int)
     args.random_seed = seed
+
+    if restart_every is None:
+        restart_every = -1
+    assert isinstance(restart_every, int)
+    args.restart_every = restart_every
 
     # -----------------------------------
     # Dataset: data, cond, subset, mirror
@@ -405,6 +412,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--metrics', help='Comma-separated list or "none" [default: fid50k_full]', type=CommaSeparatedList())
 @click.option('--seed', help='Random seed [default: 0]', type=int, metavar='INT')
 @click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
+@click.option('--restart_every', help='Time interval in seconds for restarting code', type=int, metavar='INT')
 
 # Dataset.
 @click.option('--data', help='Training data (directory or zip)', metavar='PATH', required=True)
@@ -531,6 +539,14 @@ def main(ctx, outdir, dry_run, **config_kwargs):
             subprocess_fn(rank=0, args=args, temp_dir=temp_dir)
         else:
             torch.multiprocessing.spawn(fn=subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
+
+    # Check for restart
+    snapshot_pkl_last = sorted(glob.glob(os.path.join(args.run_dir, f'network-snapshot-*')), reverse=True)[0]
+    n_kimg = int(snapshot_pkl_last[-10:-4])
+    restart = n_kimg < args.total_kimg
+    if restart:
+        print('Restart: exit with code 3')
+        exit(3)
 
 #----------------------------------------------------------------------------
 
