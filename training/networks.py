@@ -428,6 +428,7 @@ class SynthesisNetwork(torch.nn.Module):
         img_channels,               # Number of color channels.
         channel_base    = 32768,    # Overall multiplier for the number of channels.
         channel_max     = 512,      # Maximum number of channels in any layer.
+        adjust_channels = False,    # Use 16/32 channels for largest output resolution and increase from there
         num_fp16_res    = 0,        # Use FP16 for the N highest resolutions.
         **block_kwargs,             # Arguments for SynthesisBlock.
     ):
@@ -438,7 +439,13 @@ class SynthesisNetwork(torch.nn.Module):
         self.img_resolution_log2 = int(np.log2(img_resolution))
         self.img_channels = img_channels
         self.block_resolutions = [2 ** i for i in range(2, self.img_resolution_log2 + 1)]
-        channels_dict = {res: min(channel_base // res, channel_max) for res in self.block_resolutions}
+
+        if adjust_channels:
+            res_multiplier = 1024 // self.block_resolutions[-1]        # use same last channel dimension as for 1024
+        else:
+            res_multiplier = 1
+
+        channels_dict = {res: min(channel_base // (res*res_multiplier), channel_max) for res in self.block_resolutions}
         fp16_resolution = max(2 ** (self.img_resolution_log2 + 1 - num_fp16_res), 8)
 
         self.num_ws = 0
@@ -678,6 +685,7 @@ class Discriminator(torch.nn.Module):
         architecture        = 'resnet', # Architecture: 'orig', 'skip', 'resnet'.
         channel_base        = 32768,    # Overall multiplier for the number of channels.
         channel_max         = 512,      # Maximum number of channels in any layer.
+        adjust_channels     = False,    # Use 16/32 channels for largest output resolution and increase from there
         num_fp16_res        = 0,        # Use FP16 for the N highest resolutions.
         conv_clamp          = None,     # Clamp the output of convolution layers to +-X, None = disable clamping.
         cmap_dim            = None,     # Dimensionality of mapped conditioning label, None = default.
@@ -691,7 +699,13 @@ class Discriminator(torch.nn.Module):
         self.img_resolution_log2 = int(np.log2(img_resolution))
         self.img_channels = img_channels
         self.block_resolutions = [2 ** i for i in range(self.img_resolution_log2, 2, -1)]
-        channels_dict = {res: min(channel_base // res, channel_max) for res in self.block_resolutions + [4]}
+
+        if adjust_channels:
+            res_multiplier = 1024 // self.block_resolutions[0]        # use same last channel dimension as for 1024
+        else:
+            res_multiplier = 1
+
+        channels_dict = {res: min(channel_base // (res*res_multiplier), channel_max) for res in self.block_resolutions + [4]}
         fp16_resolution = max(2 ** (self.img_resolution_log2 + 1 - num_fp16_res), 8)
 
         if cmap_dim is None:
