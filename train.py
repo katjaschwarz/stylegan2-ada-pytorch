@@ -21,7 +21,6 @@ from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
-from torch_utils import misc
 
 #----------------------------------------------------------------------------
 
@@ -36,7 +35,6 @@ def setup_training_loop_kwargs(
     snap       = None, # Snapshot interval: <int>, default = 50 ticks
     metrics    = None, # List of metric names: [], ['fid50k_full'] (default), ...
     seed       = None, # Random seed: <int>, default = 0
-    restart_every = None,  # Time interval in seconds for restarting code
 
     # Dataset.
     data       = None, # Training dataset (required): <path>
@@ -99,9 +97,6 @@ def setup_training_loop_kwargs(
         seed = 0
     assert isinstance(seed, int)
     args.random_seed = seed
-
-    if restart_every is not None:
-        args.restart_every = restart_every
 
     # -----------------------------------
     # Dataset: data, cond, subset, mirror
@@ -410,7 +405,6 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--metrics', help='Comma-separated list or "none" [default: fid50k_full]', type=CommaSeparatedList())
 @click.option('--seed', help='Random seed [default: 0]', type=int, metavar='INT')
 @click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
-@click.option('--restart_every', help='Abort with exit code 3', type=int, metavar='INT')
 
 # Dataset.
 @click.option('--data', help='Training data (directory or zip)', metavar='PATH', required=True)
@@ -528,12 +522,6 @@ def main(ctx, outdir, dry_run, **config_kwargs):
     os.makedirs(args.run_dir)
     with open(os.path.join(args.run_dir, 'training_options.json'), 'wt') as f:
         json.dump(args, f, indent=2)
-
-    # Start timer
-    if args.restart_every is not None:
-        restarter = misc.Restarter(args.restart_every)
-        args['abort_fn'] = restarter.restart
-        del args.restart_every
 
     # Launch processes.
     print('Launching processes...')

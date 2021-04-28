@@ -260,18 +260,3 @@ def print_module_summary(module, inputs, max_nesting=3, skip_redundant=True):
     return outputs
 
 #----------------------------------------------------------------------------
-
-#----------------------------------------------------------------------------
-# Some utils added by Katja
-from time import time
-
-class Restarter(object):
-    def __init__(self, restart_every):
-        super(Restarter, self).__init__()
-        self.tinit = time()
-        self.restart_every = restart_every
-
-    def restart(self):
-        tcurr = time() - self.tinit
-        print(f'Elapsed time {tcurr:.0f}')
-        return tcurr > self.restart_every
