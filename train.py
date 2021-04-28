@@ -16,12 +16,12 @@ import json
 import tempfile
 import torch
 import dnnlib
-import glob
 
 from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
+from torch_utils import misc
 
 #----------------------------------------------------------------------------
 
@@ -545,8 +545,7 @@ def main(ctx, outdir, dry_run, **config_kwargs):
             torch.multiprocessing.spawn(fn=subprocess_fn, args=(args, temp_dir), nprocs=args.num_gpus)
 
     # Check for restart
-    snapshot_pkl_last = sorted(glob.glob(os.path.join(args.run_dir, f'network-snapshot-*')), reverse=True)[0]
-    n_kimg = int(snapshot_pkl_last[-10:-4])
+    snapshot_pkl_last, n_kimg = misc.get_last_snapshot(args.run_dir)
     restart = n_kimg < args.total_kimg
     if restart:
         print('Restart: exit with code 3')

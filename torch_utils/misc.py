@@ -260,3 +260,15 @@ def print_module_summary(module, inputs, max_nesting=3, skip_redundant=True):
     return outputs
 
 #----------------------------------------------------------------------------
+# Custom functions added by Katja
+import glob
+import os
+
+
+def get_last_snapshot(run_dir):
+    snapshot_pkl_last = sorted(glob.glob(os.path.join(run_dir, f'network-snapshot-*')), reverse=True)[0]
+    n_kimg = int(snapshot_pkl_last[-10:-4])
+    if n_kimg == 0:
+        snapshot_pkl_last = None
+
+    return snapshot_pkl_last, n_kimg
