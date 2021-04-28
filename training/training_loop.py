@@ -350,7 +350,8 @@ def training_loop(
         if rank == 0 and restart_every > 0 and time.time() - start_time > restart_every:
             print('Restart job...')
             __RESTART__ = torch.tensor(1., device=device)
-        torch.distributed.broadcast(__RESTART__, 0)
+        if num_gpus > 1:
+            torch.distributed.broadcast(__RESTART__, 0)
         if __RESTART__:
             done = True
             print(f'Process {rank} leaving...')
