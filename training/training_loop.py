@@ -252,14 +252,20 @@ def training_loop(
     if rank == 0:
         print(f'Training for {total_kimg} kimg...')
         print()
-    cur_nimg = 0
-    cur_tick = 0
+
+    if ckpt_pkl is not None:        # when resuming from checkpoint
+        cur_nimg = resume_data['progress']['cur_nimg']
+        cur_tick = resume_data['progress']['cur_tick']
+        batch_idx = resume_data['progress']['batch_idx']
+    else:
+        cur_nimg = 0
+        cur_tick = 0
+        batch_idx = 0
     tick_start_nimg = cur_nimg
     tick_start_time = time.time()
     maintenance_time = tick_start_time - start_time
-    batch_idx = 0
     if progress_fn is not None:
-        progress_fn(0, total_kimg)
+        progress_fn(cur_nimg // 1000, total_kimg)
     while True:
 
         # Fetch training data.
@@ -381,6 +387,11 @@ def training_loop(
                 del module # conserve memory
             snapshot_pkl = os.path.join(run_dir, f'network-snapshot-{cur_nimg//1000:06d}.pkl')
             if rank == 0:
+                snapshot_data['progress'] = {
+                    'cur_nimg': cur_nimg,
+                    'cur_tick': cur_tick,
+                    'batch_idx': batch_idx
+                }
                 with open(snapshot_pkl, 'wb') as f:
                     pickle.dump(snapshot_data, f)
 

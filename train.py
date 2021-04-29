@@ -417,6 +417,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--seed', help='Random seed [default: 0]', type=int, metavar='INT')
 @click.option('-n', '--dry-run', help='Print training options and exit', is_flag=True)
 @click.option('--restart_every', help='Time interval in seconds for restarting code', type=int, metavar='INT')
+@click.option('--resume_from_ckpt', help='If existant, resume from checkpoint', is_flag=True)
 
 # Dataset.
 @click.option('--data', help='Training data (directory or zip)', metavar='PATH', required=True)
@@ -447,7 +448,7 @@ class CommaSeparatedList(click.ParamType):
 @click.option('--allow-tf32', help='Allow PyTorch to use TF32 internally', type=bool, metavar='BOOL')
 @click.option('--workers', help='Override number of DataLoader workers', type=int, metavar='INT')
 
-def main(ctx, outdir, dry_run, **config_kwargs):
+def main(ctx, outdir, resume_from_ckpt, dry_run, **config_kwargs):
     """Train a GAN using the techniques described in the paper
     "Training Generative Adversarial Networks with Limited Data".
 
@@ -503,11 +504,27 @@ def main(ctx, outdir, dry_run, **config_kwargs):
     prev_run_dirs = []
     if os.path.isdir(outdir):
         prev_run_dirs = [x for x in os.listdir(outdir) if os.path.isdir(os.path.join(outdir, x))]
-    prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
-    prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
-    cur_run_id = max(prev_run_ids, default=-1) + 1
+
+    if resume_from_ckpt:        # check for runs with exact same desc, should be only a single one
+        prev_run_ids = []
+        for x in prev_run_dirs:
+            match = re.fullmatch(rf'^\d+-{run_desc}', x)
+            if match is not None:
+                run_id = int(re.match(r'^\d+', x).group())
+                prev_run_ids.append(run_id)
+
+        if len(prev_run_ids) > 1:
+            raise AttributeError('Multiple runs available, do not know from which to restart')
+
+        cur_run_id = prev_run_ids[0]
+    else:
+        prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
+        prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
+        cur_run_id = max(prev_run_ids, default=-1) + 1
+
     args.run_dir = os.path.join(outdir, f'{cur_run_id:05d}-{run_desc}')
-    assert not os.path.exists(args.run_dir)
+    if not resume_from_ckpt:
+        assert not os.path.exists(args.run_dir)
 
     # Print options.
     print()
@@ -531,7 +548,7 @@ def main(ctx, outdir, dry_run, **config_kwargs):
 
     # Create output directory.
     print('Creating output directory...')
-    os.makedirs(args.run_dir)
+    os.makedirs(args.run_dir, exist_ok=resume_from_ckpt)
     with open(os.path.join(args.run_dir, 'training_options.json'), 'wt') as f:
         json.dump(args, f, indent=2)
 
