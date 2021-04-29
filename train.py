@@ -515,8 +515,12 @@ def main(ctx, outdir, resume_from_ckpt, dry_run, **config_kwargs):
 
         if len(prev_run_ids) > 1:
             raise AttributeError('Multiple runs available, do not know from which to restart')
-
-        cur_run_id = prev_run_ids[0]
+        elif len(prev_run_ids) == 0:        # fall back to standard procedure
+            prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
+            prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
+            cur_run_id = max(prev_run_ids, default=-1) + 1
+        else:
+            cur_run_id = prev_run_ids[0]
     else:
         prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
         prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
