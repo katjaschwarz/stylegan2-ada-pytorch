@@ -266,8 +266,9 @@ import os
 
 
 def get_last_snapshot(run_dir):
-    snapshot_pkl_last = sorted(glob.glob(os.path.join(run_dir, f'network-snapshot-*')), reverse=True)[0]
-    if len(snapshot_pkl_last) == 0:
+    try:
+        snapshot_pkl_last = sorted(glob.glob(os.path.join(run_dir, f'network-snapshot-*')), reverse=True)[0]
+    except IndexError:
         return None, 0
     n_kimg = int(snapshot_pkl_last[-10:-4])
     if n_kimg == 0:
